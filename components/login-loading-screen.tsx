@@ -19,7 +19,7 @@ export function LoginLoadingScreen({ isLoading }: { isLoading: boolean }) {
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-end justify-end z-50 p-4">
       {/* Bottom-right notification popup - minimal and professional */}
-      <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-lg shadow-lg p-4 max-w-xs border border-gray-200 dark:border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="flex items-center max-w-xs border border-gray-200 dark:border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="relative w-8 h-8 flex-shrink-0">
           <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-blue-600 dark:border-t-blue-400 animate-spin" />
         </div>

@@ -68,18 +68,16 @@ export default function LoginForm() {
       <LoginLoadingScreen isLoading={loading} />
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
         <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <div className="flex items-center gap-2 mb-4">
+          <CardHeader className="">
+            <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-bold">
                 HR
               </div>
               <span className="text-xl font-bold text-primary">HRMS Portal</span>
             </div>
-            <CardTitle className="text-2xl">Welcome Back</CardTitle>
-            <CardDescription>Sign in to your HRMS account to continue</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-2">
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
