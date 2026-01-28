@@ -5,17 +5,75 @@ import DashboardCard from "@/components/dashboard-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 export default function AdminDashboard() {
   const { user, loading, userRole } = useAuth()
   const router = useRouter()
+  const [stats, setStats] = useState({
+    employees: 0,
+    recruiters: 0,
+    jobs: 0,
+    interviews: 0,
+    presentToday: 0,
+    absentToday: 0
+  })
 
   useEffect(() => {
     if (!loading && (!user || userRole !== "admin")) {
       router.push("/login")
     }
   }, [loading, user, userRole, router])
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem("authToken")
+        const headers = { Authorization: `Bearer ${token}` }
+
+        // Fetch Employees Count
+        const empRes = await fetch("/api/employees?limit=1", { headers })
+        const empData = await empRes.json()
+        const totalEmployees = empData.pagination?.total || (empData.data?.length || 0)
+
+        // Fetch Recruiters Count
+        const recRes = await fetch("/api/recruiters?limit=1", { headers })
+        const recData = await recRes.json()
+
+        // Fetch Jobs Count
+        const jobRes = await fetch("/api/jobs?limit=1", { headers })
+        const jobData = await jobRes.json()
+
+        // Fetch Interviews Count
+        const intRes = await fetch("/api/interviews", { headers })
+        const intData = await intRes.json()
+
+        // Fetch Attendance Stats
+        const attRes = await fetch("/api/attendance/dashboard", { headers })
+        const attData = await attRes.json()
+
+        let presentCount = 0
+        if (attData.success && attData.data) {
+          presentCount = attData.data.length
+        }
+
+        setStats({
+          employees: totalEmployees,
+          recruiters: recData.pagination?.total || (recData.data?.length || 0),
+          jobs: jobData.pagination?.total || (jobData.data?.length || 0),
+          interviews: intData.data?.length || 0,
+          presentToday: presentCount,
+          absentToday: Math.max(0, totalEmployees - presentCount)
+        })
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats", error)
+      }
+    }
+
+    if (user && userRole === "admin") {
+      fetchStats()
+    }
+  }, [user, userRole])
 
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
 
@@ -25,7 +83,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <DashboardCard
           label="Total Employees"
-          value="156"
+          value={stats.employees.toString()}
           icon={Users}
           description="Active employees on payroll"
           href="/admin/employees"
@@ -33,7 +91,7 @@ export default function AdminDashboard() {
         />
         <DashboardCard
           label="Recruiters"
-          value="12"
+          value={stats.recruiters.toString()}
           icon={Briefcase}
           description="Active recruitment team"
           href="/admin/recruiters"
@@ -41,15 +99,21 @@ export default function AdminDashboard() {
         />
         <DashboardCard
           label="Present Today"
-          value="142"
+          value={stats.presentToday.toString()}
           icon={CheckCircle}
           description="Employees checked in"
           trend={{ value: 2, isPositive: false }}
         />
-        <DashboardCard label="Absent Today" value="8" icon={Calendar} description="On leave or absent" href="/admin/leave" />
+        <DashboardCard
+          label="Absent Today"
+          value={stats.absentToday.toString()}
+          icon={Calendar}
+          description="On leave or absent"
+          href="/admin/leave"
+        />
         <DashboardCard
           label="Job Postings"
-          value="7"
+          value={stats.jobs.toString()}
           icon={Briefcase}
           description="Open positions"
           href="/admin/jobs"
@@ -57,7 +121,7 @@ export default function AdminDashboard() {
         />
         <DashboardCard
           label="Interviews Scheduled"
-          value="24"
+          value={stats.interviews.toString()}
           icon={FileText}
           description="This month"
           href="/admin/interviews"
@@ -84,13 +148,12 @@ export default function AdminDashboard() {
                   <p className="text-sm text-muted-foreground">{activity.time}</p>
                 </div>
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    activity.status === "pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : activity.status === "approved"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-blue-100 text-blue-700"
-                  }`}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${activity.status === "pending"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : activity.status === "approved"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-blue-100 text-blue-700"
+                    }`}
                 >
                   {activity.status}
                 </span>
@@ -98,7 +161,7 @@ export default function AdminDashboard() {
             ))}
           </div>
         </CardContent>
-        </Card>
+      </Card>
     </main>
   )
 }

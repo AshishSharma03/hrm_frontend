@@ -16,8 +16,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 export default function CreateJobModal({ onSubmit }: { onSubmit?: (data: any) => void }) {
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [formData, setFormData] = useState({
     jobTitle: "",
@@ -29,19 +31,41 @@ export default function CreateJobModal({ onSubmit }: { onSubmit?: (data: any) =>
     description: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit?.(formData)
-    setFormData({
-      jobTitle: "",
-      department: "",
-      experience: "",
-      salary: "",
-      jobType: "",
-      location: "",
-      description: "",
-    })
-    setOpen(false)
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          createdBy: user?.id
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        onSubmit?.(data.data)
+        setFormData({
+          jobTitle: "",
+          department: "",
+          experience: "",
+          salary: "",
+          jobType: "",
+          location: "",
+          description: "",
+        })
+        setOpen(false)
+      } else {
+        alert(data.message || "Failed to post job")
+      }
+    } catch (error) {
+      console.error("Post job failed", error)
+      alert("An error occurred")
+    }
   }
 
   return (

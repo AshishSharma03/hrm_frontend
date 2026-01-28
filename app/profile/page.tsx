@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,14 +13,45 @@ import { User, Mail, Phone, Briefcase, Calendar } from "lucide-react"
 export default function ProfilePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [profile, setProfile] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const fetchProfileData = async () => {
+    if (!user) return
+    setIsLoading(true)
+    try {
+      const token = localStorage.getItem("authToken")
+      let endpoint = `/api/employees/${user.id}`
+
+      if (user.role === "recruiter") {
+        endpoint = `/api/recruiters/${user.id}`
+      } else if (user.role === "admin") {
+        endpoint = `/api/auth/me`
+      }
+
+      const res = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setProfile(data.data || data.user)
+      }
+    } catch (error) {
+      console.error("Error fetching profile", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login")
+    } else if (!loading && user) {
+      fetchProfileData()
     }
   }, [loading, user, router])
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  if (loading || isLoading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   if (!user) return null
 
   const userInitials = user.name
@@ -28,6 +59,9 @@ export default function ProfilePage() {
     .map((n) => n[0])
     .join("")
     .toUpperCase()
+
+  const displayName = profile?.name || user.name
+  const roleDisplay = user.role.charAt(0).toUpperCase() + user.role.slice(1)
 
   return (
     <main className="md:ml-64 md:mt-24 p-4 md:p-8 mt-32">
@@ -44,7 +78,7 @@ export default function ProfilePage() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-center md:text-left">
-                  <h1 className="text-2xl font-bold text-foreground">{user.name}</h1>
+                  <h1 className="text-2xl font-bold text-foreground">{displayName}</h1>
                   <p className="text-muted-foreground capitalize">{user.role}</p>
                 </div>
               </div>
@@ -75,11 +109,11 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>First Name</Label>
-                <Input value={user.name.split(" ")[0]} disabled />
+                <Input value={profile?.firstName || user.name.split(" ")[0]} disabled />
               </div>
               <div className="space-y-2">
                 <Label>Last Name</Label>
-                <Input value={user.name.split(" ").slice(1).join(" ")} disabled />
+                <Input value={profile?.lastName || user.name.split(" ").slice(1).join(" ")} disabled />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -95,7 +129,7 @@ export default function ProfilePage() {
                   <Phone size={16} />
                   Phone Number
                 </Label>
-                <Input placeholder="+1 (555) 000-0000" disabled />
+                <Input placeholder="+1 (555) 000-0000" value={profile?.phone || ""} disabled />
               </div>
             </div>
           </CardContent>
@@ -114,24 +148,33 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Input value={user.role.charAt(0).toUpperCase() + user.role.slice(1)} disabled />
+                <Input value={roleDisplay} disabled />
               </div>
               <div className="space-y-2">
                 <Label>Department</Label>
-                <Input value="Human Resources" disabled />
+                <Input value={profile?.department || profile?.specialization || "General"} disabled />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Designation</Label>
-                <Input value="Administrator" disabled />
+                <Input value={profile?.designation || (user.role === 'admin' ? 'Administrator' : 'Employee')} disabled />
               </div>
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Calendar size={16} />
                   Join Date
                 </Label>
-                <Input value={new Date().toLocaleDateString()} disabled />
+                <Input
+                  value={
+                    profile?.joinDate
+                      ? new Date(profile.joinDate).toLocaleDateString()
+                      : profile?.createdAt
+                        ? new Date(profile.createdAt).toLocaleDateString()
+                        : new Date().toLocaleDateString()
+                  }
+                  disabled
+                />
               </div>
             </div>
           </CardContent>

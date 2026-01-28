@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -17,46 +17,67 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Plus } from "lucide-react"
 
-export default function AwardPointsModal({ onSubmit }: { onSubmit?: (data: any) => void }) {
+export default function AwardPointsModal({ onSubmit }: { onSubmit?: () => void }) {
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const [employees, setEmployees] = useState<any[]>([])
   const [formData, setFormData] = useState({
-    employeeEmail: "",
-    points: "",
+    employeeId: "",
+    points: 0,
+    category: "Performance Bonus",
     reason: "",
-    category: "",
   })
+
+  useEffect(() => {
+    if (open) {
+      const fetchEmployees = async () => {
+        try {
+          const token = localStorage.getItem("authToken")
+          const res = await fetch("/api/employees", {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          const data = await res.json()
+          if (data.success) {
+            setEmployees(data.data)
+          }
+        } catch (error) {
+          console.error("Failed to fetch employees", error)
+        }
+      }
+      fetchEmployees()
+    }
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
-    setLoading(true)
-
     try {
-      if (!formData.employeeEmail || !formData.points || !formData.reason || !formData.category) {
-        throw new Error("Please fill all required fields")
-      }
-
-      if (Number(formData.points) <= 0) {
-        throw new Error("Points must be greater than 0")
-      }
-
-      if (onSubmit) {
-        await Promise.resolve(onSubmit(formData))
-      }
-
-      setFormData({
-        employeeEmail: "",
-        points: "",
-        reason: "",
-        category: "",
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/rewards/award", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          awardedBy: "ADMIN"
+        })
       })
-      setOpen(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to award points")
-    } finally {
-      setLoading(false)
+      const data = await res.json()
+      if (data.success) {
+        onSubmit?.()
+        setFormData({
+          employeeId: "",
+          points: 0,
+          category: "Performance Bonus",
+          reason: "",
+        })
+        setOpen(false)
+      } else {
+        alert(data.message || "Failed to award points")
+      }
+    } catch (error) {
+      console.error("Award points failed", error)
+      alert("An error occurred")
     }
   }
 
@@ -68,58 +89,62 @@ export default function AwardPointsModal({ onSubmit }: { onSubmit?: (data: any) 
           Award Points
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Award Reward Points</DialogTitle>
-          <DialogDescription>Give reward points to employees for their achievements</DialogDescription>
+          <DialogDescription>Select an employee and award points</DialogDescription>
         </DialogHeader>
 
-        {error && (
-          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 p-3 rounded-md text-sm">
-            {error}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="employee">Select Employee</Label>
+            <Select
+              value={formData.employeeId}
+              onValueChange={(val) => setFormData({ ...formData, employeeId: val })}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select employee" />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.name || `${emp.firstName} ${emp.lastName}`} ({emp.id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="employeeEmail">Employee Email</Label>
-              <Input
-                id="employeeEmail"
-                type="email"
-                placeholder="employee@company.com"
-                value={formData.employeeEmail}
-                onChange={(e) => setFormData({ ...formData, employeeEmail: e.target.value })}
-                required
-              />
+              <Label htmlFor="category">Category</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(val) => setFormData({ ...formData, category: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Performance Bonus">Performance Bonus</SelectItem>
+                  <SelectItem value="Attendance Reward">Attendance Reward</SelectItem>
+                  <SelectItem value="Employee Referral">Employee Referral</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="points">Points to Award</Label>
+              <Label htmlFor="points">Points</Label>
               <Input
                 id="points"
                 type="number"
                 placeholder="100"
                 value={formData.points}
-                onChange={(e) => setFormData({ ...formData, points: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, points: Number(e.target.value) })}
                 required
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
-            <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="performance">Performance</SelectItem>
-                <SelectItem value="attendance">Attendance</SelectItem>
-                <SelectItem value="innovation">Innovation</SelectItem>
-                <SelectItem value="teamwork">Teamwork</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
@@ -129,17 +154,16 @@ export default function AwardPointsModal({ onSubmit }: { onSubmit?: (data: any) 
               placeholder="Reason for awarding points..."
               value={formData.reason}
               onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              className="min-h-24"
               required
             />
           </div>
 
           <div className="flex gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1" disabled={loading}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" className="flex-1" disabled={loading}>
-              {loading ? "Awarding..." : "Award Points"}
+            <Button type="submit" className="flex-1">
+              Award
             </Button>
           </div>
         </form>

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { LoginLoadingScreen } from "@/components/login-loading-screen"
+import Link from "next/link"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
@@ -24,7 +25,6 @@ export default function LoginForm() {
     setLoading(true)
 
     try {
-      // Direct API call without context dependency
       const loginResponse = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -37,25 +37,25 @@ export default function LoginForm() {
       }
 
       const loginData = await loginResponse.json()
-      
+
       if (!loginData.token || !loginData.user) {
         throw new Error("Invalid response from server")
       }
-      
+
       localStorage.setItem("authToken", loginData.token)
       localStorage.setItem("userRole", loginData.user.role)
 
       const redirectPath =
-        {
-          admin: "/admin/dashboard",
-          recruiter: "/recruiter/dashboard",
-          employee: "/employee/dashboard",
-        }[loginData.user.role] || "/"
+        (
+          {
+            admin: "/admin/dashboard",
+            recruiter: "/recruiter/dashboard",
+            employee: "/employee/dashboard",
+            candidate: "/onboarding",
+          } as Record<string, string>
+        )[loginData.user.role] || "/"
 
-      // Reload to ensure auth state is updated
-      setTimeout(() => {
-        window.location.href = redirectPath
-      }, 300)
+      window.location.href = redirectPath
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Login failed"
       setError(errorMessage)
@@ -77,7 +77,7 @@ export default function LoginForm() {
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-2">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -115,9 +115,16 @@ export default function LoginForm() {
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
+
+              <div className="text-center pt-4 border-t mt-4">
+                <p className="text-sm text-muted-foreground">
+                  New here?{" "}
+                  <Link href="/register" className="text-primary font-semibold hover:underline">
+                    Join as Candidate
+                  </Link>
+                </p>
+              </div>
             </form>
-
-
           </CardContent>
         </Card>
       </div>

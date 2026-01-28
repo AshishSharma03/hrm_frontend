@@ -8,30 +8,70 @@ import { Button } from "@/components/ui/button"
 import { Plus, Download, Mail } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+import GenerateSalaryModal from "@/components/modals/generate-salary-modal"
+import { SkeletonGrid, SkeletonTable } from "@/components/skeleton-loader"
+
 export default function AdminSalaryPage() {
   const { user, loading, userRole } = useAuth()
   const router = useRouter()
-  const [salaries] = useState([
-    { id: "E001", name: "John Doe", designation: "Senior Developer", salary: 90000, status: "paid" },
-    { id: "E002", name: "Jane Smith", designation: "HR Manager", salary: 75000, status: "paid" },
-    { id: "E003", name: "Mike Johnson", designation: "Sales Executive", salary: 60000, status: "pending" },
-  ])
+  const [employees, setEmployees] = useState<any[]>([])
+  const [salariesMap, setSalariesMap] = useState<Record<string, any>>({})
+  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const headers = { Authorization: `Bearer ${token}` }
+
+      // Fetch Employees
+      const empRes = await fetch("/api/employees", { headers })
+      const empData = await empRes.json()
+      if (empData.success) {
+        setEmployees(empData.data)
+
+        // Fetch Salary Structure for each employee
+        const salariesResp: Record<string, any> = {}
+        await Promise.all(empData.data.map(async (emp: any) => {
+          try {
+            const sRes = await fetch(`/api/salary/${emp.id}`, { headers })
+            const sData = await sRes.json()
+            if (sData.success) {
+              salariesResp[emp.id] = sData.data
+            }
+          } catch (e) {
+            console.error(`Error fetching salary for ${emp.id}`, e)
+          }
+        }))
+        setSalariesMap(salariesResp)
+      }
+    } catch (error) {
+      console.error("Error fetching salary data", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!loading && (!user || userRole !== "admin")) {
       router.push("/login")
+    } else if (!loading) {
+      fetchData()
     }
   }, [loading, user, userRole, router])
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  if (loading || isLoading) {
+    return (
+      <main className="md:ml-64 md:mt-24 p-4 md:p-8 mt-32">
+        <SkeletonGrid count={3} />
+        <SkeletonTable />
+      </main>
+    )
+  }
 
   return (
     <main className="md:ml-64 md:mt-24 p-4 md:p-8 mt-32">
       <div className="mb-8 flex justify-end">
-        <Button className="flex items-center gap-2">
-          <Plus size={18} />
-          Generate Salary Slip
-        </Button>
+        <GenerateSalaryModal onSubmit={() => fetchData()} />
       </div>
 
       {/* Stats */}
@@ -39,19 +79,19 @@ export default function AdminSalaryPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Total Active Employees</p>
-            <p className="text-3xl font-bold">156</p>
+            <p className="text-3xl font-bold">{employees.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Paid This Month</p>
-            <p className="text-3xl font-bold text-green-600">150</p>
+            <p className="text-sm text-muted-foreground mb-1">Configured</p>
+            <p className="text-3xl font-bold text-green-600">{Object.keys(salariesMap).length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Pending</p>
-            <p className="text-3xl font-bold text-yellow-600">6</p>
+            <p className="text-sm text-muted-foreground mb-1">Missing Config</p>
+            <p className="text-3xl font-bold text-yellow-600">{Math.max(0, employees.length - Object.keys(salariesMap).length)}</p>
           </CardContent>
         </Card>
       </div>
@@ -60,46 +100,48 @@ export default function AdminSalaryPage() {
       <Tabs defaultValue="all">
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="paid">Paid</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="configured">Configured</TabsTrigger>
+          <TabsTrigger value="missing">Missing Config</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {salaries.map((salary) => (
-            <Card key={salary.id} className="hover:shadow-lg transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">{salary.name}</h3>
-                    <p className="text-sm text-muted-foreground">{salary.designation}</p>
+          {employees.map((emp) => {
+            const structure = salariesMap[emp.id]?.structure
+            return (
+              <Card key={emp.id} className="hover:shadow-lg transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">{emp.name || `${emp.firstName} ${emp.lastName}`}</h3>
+                      <p className="text-sm text-muted-foreground">{emp.designation || emp.department}</p>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${structure ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                        }`}
+                    >
+                      {structure ? 'Configured' : 'Missing Config'}
+                    </span>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      salary.status === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                    }`}
-                  >
-                    {salary.status.charAt(0).toUpperCase() + salary.status.slice(1)}
-                  </span>
-                </div>
 
-                <div className="mb-4">
-                  <p className="text-sm text-muted-foreground mb-1">Monthly Salary</p>
-                  <p className="text-2xl font-bold">₹{salary.salary.toLocaleString()}</p>
-                </div>
+                  <div className="mb-4">
+                    <p className="text-sm text-muted-foreground mb-1">Monthly Net Salary</p>
+                    <p className="text-2xl font-bold">₹{structure?.netSalary?.toLocaleString() || '0'}</p>
+                  </div>
 
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline">
-                    <Download size={16} className="mr-2" />
-                    Download Slip
-                  </Button>
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                    <Mail size={16} className="mr-2" />
-                    Send Email
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => router.push(`/admin/salary/${emp.id}`)}>
+                      <Download size={16} className="mr-2" />
+                      View Structure
+                    </Button>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                      <Mail size={16} className="mr-2" />
+                      Send Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </TabsContent>
       </Tabs>
     </main>

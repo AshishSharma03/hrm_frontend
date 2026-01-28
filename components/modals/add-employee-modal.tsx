@@ -32,22 +32,41 @@ export default function AddEmployeeModal({ onSubmit }: { onSubmit?: (data: any) 
     confirmPassword: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit?.(formData)
-    setFormData({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      department: "",
-      designation: "",
-      joinDate: "",
-      reportsTo: "",
-      password: "",
-      confirmPassword: "",
-    })
-    setOpen(false)
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/employees", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      })
+      const data = await res.json()
+      if (data.success) {
+        onSubmit?.(data.data)
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          phone: "",
+          department: "",
+          designation: "",
+          joinDate: "",
+          reportsTo: "",
+          password: "",
+          confirmPassword: "",
+        })
+        setOpen(false)
+      } else {
+        alert(data.message || "Failed to create employee")
+      }
+    } catch (error) {
+      console.error("Create employee failed", error)
+      alert("An error occurred")
+    }
   }
 
   return (

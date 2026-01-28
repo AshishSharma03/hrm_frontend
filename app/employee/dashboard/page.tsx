@@ -15,7 +15,10 @@ export default function EmployeeDashboard() {
   const router = useRouter()
   const [isCheckedIn, setIsCheckedIn] = useState(false)
   const [checkInTime, setCheckInTime] = useState<string | null>(null)
+  const [leaveBalance, setLeaveBalance] = useState(0)
+  const [rewardsPoints, setRewardsPoints] = useState(0)
   const [hoursWorked, setHoursWorked] = useState("0h 0m")
+  const [attendanceId, setAttendanceId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && (!user || userRole !== "employee")) {
@@ -23,18 +26,117 @@ export default function EmployeeDashboard() {
     }
   }, [loading, user, userRole, router])
 
-  const handleCheckIn = () => {
-    const now = new Date()
-    const timeString = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
-    setCheckInTime(timeString)
-    setIsCheckedIn(true)
+  const fetchData = async () => {
+    if (!user) return
+    try {
+      const token = localStorage.getItem("authToken")
+      const headers = { Authorization: `Bearer ${token}` }
+
+      // Fetch Leave Balance
+      const leaveRes = await fetch(`/api/leave/balance/${user.id}`, { headers })
+      const leaveData = await leaveRes.json()
+      if (leaveData.success) {
+        setLeaveBalance(leaveData.data.remainingDays)
+      }
+
+      // Fetch Rewards
+      const rewardRes = await fetch(`/api/rewards/${user.id}`, { headers })
+      const rewardData = await rewardRes.json()
+      if (rewardData.success) {
+        setRewardsPoints(rewardData.data.totalPoints || 0)
+      }
+
+      // Fetch Today's Attendance Status
+      const attendanceRes = await fetch("/api/attendance/today", { headers })
+      const attendanceData = await attendanceRes.json()
+      if (attendanceData.success && attendanceData.data) {
+        const status = attendanceData.data.status
+        setIsCheckedIn(status === "ACTIVE")
+        if (attendanceData.data.checkIn) {
+          setCheckInTime(new Date(attendanceData.data.checkIn).toLocaleTimeString())
+        }
+        if (attendanceData.data.workedHours) {
+          setHoursWorked(`${attendanceData.data.workedHours}h`)
+        }
+      }
+
+    } catch (error) {
+      console.error("Error fetching employee data", error)
+    }
   }
 
-  const handleCheckOut = () => {
-    if (checkInTime) {
-      setIsCheckedIn(false)
-      // Calculate hours worked
-      setHoursWorked("8h 30m")
+  // Fetch initial data
+  useEffect(() => {
+    fetchData()
+  }, [user])
+
+  const handleCheckIn = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const now = new Date()
+
+      // Simple location mock
+      const locationData = {
+        employeeId: user?.id,
+        location: "Office",
+        timestamp: now.toISOString(),
+        latitude: 0,
+        longitude: 0
+      }
+
+      const res = await fetch("/api/attendance/checkin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(locationData)
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        // Backend returns { success: true, data: { checkIn: "..." } }
+        setCheckInTime(new Date(data.data.checkIn).toLocaleTimeString())
+        setIsCheckedIn(true)
+      }
+    } catch (error) {
+      console.error("Check-in failed", error)
+    }
+  }
+
+  const handleCheckOut = async () => {
+    if (!attendanceId && !isCheckedIn) return // Simplified check
+
+    try {
+      const token = localStorage.getItem("authToken")
+      const now = new Date()
+
+      const locationData = {
+        employeeId: user?.id,
+        location: "Office",
+        timestamp: now.toISOString(),
+        latitude: 0,
+        longitude: 0
+      }
+
+      const res = await fetch("/api/attendance/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(locationData)
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setIsCheckedIn(false)
+        // Backend returns { success: true, data: { totalWorkedHours: ... } }
+        setHoursWorked(`${data.data.totalWorkedHours}h`)
+        setCheckInTime(null)
+      }
+    } catch (error) {
+      console.error("Check-out failed", error)
     }
   }
 
@@ -74,14 +176,14 @@ export default function EmployeeDashboard() {
         <DashboardCard label="Hours Worked" value={hoursWorked} icon={Clock} description="Current day" />
         <DashboardCard
           label="Leave Balance"
-          value="12"
+          value={leaveBalance.toString()}
           icon={FileText}
           description="Days remaining"
           trend={{ value: 2, isPositive: false }}
         />
         <DashboardCard
           label="Reward Points"
-          value="450"
+          value={rewardsPoints.toString()}
           icon={Award}
           description="Total earned"
           trend={{ value: 25, isPositive: true }}
@@ -123,25 +225,25 @@ export default function EmployeeDashboard() {
           <CardContent className="space-y-2">
             <EditProfileModal
               userEmail={user?.email}
-              onSubmit={(data) => {
-                console.log("Profile updated:", data)
+              onSubmit={() => {
+                fetchData()
               }}
             />
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button variant="outline" className="w-full justify-start bg-transparent" onClick={() => router.push("/employee/salary")}>
               <FileText size={16} className="mr-2" />
               Download Salary Slip
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button variant="outline" className="w-full justify-start bg-transparent" onClick={() => router.push("/employee/leave")}>
               <Clock size={16} className="mr-2" />
               Apply for Leave
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button variant="outline" className="w-full justify-start bg-transparent" onClick={() => router.push("/employee/jobs")}>
               <Briefcase size={16} className="mr-2" />
               View Job Postings
             </Button>
             <ReferCandidateModal
-              onSubmit={(data) => {
-                console.log("Referral submitted:", data)
+              onSubmit={() => {
+                fetchData()
               }}
             />
           </CardContent>

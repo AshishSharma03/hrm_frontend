@@ -28,18 +28,45 @@ export default function AddJobModal({ onSubmit }: { onSubmit?: (data: any) => vo
     experience: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit?.(formData)
-    setFormData({
-      title: "",
-      department: "",
-      description: "",
-      requirements: "",
-      salary: "",
-      experience: "",
-    })
-    setOpen(false)
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          jobTitle: formData.title,
+          department: formData.department,
+          description: formData.description,
+          requirements: formData.requirements.split('\n'),
+          salary: formData.salary,
+          experience: formData.experience,
+          createdBy: "ADMIN" // Backend might need this or get from token
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        onSubmit?.(data.data)
+        setFormData({
+          title: "",
+          department: "",
+          description: "",
+          requirements: "",
+          salary: "",
+          experience: "",
+        })
+        setOpen(false)
+      } else {
+        alert(data.message || "Failed to post job")
+      }
+    } catch (error) {
+      console.error("Post job failed", error)
+      alert("An error occurred")
+    }
   }
 
   return (

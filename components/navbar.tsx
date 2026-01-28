@@ -174,50 +174,51 @@ export default function Navbar() {
         {/* Theme Switcher */}
         <ThemeSwitcher />
 
-        {/* Announcements/Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="relative p-2 hover:bg-muted rounded-lg transition-colors">
-              <Bell size={20} className="text-foreground" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-accent rounded-full flex items-center justify-center text-xs text-accent-foreground font-bold">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <div className="p-3 border-b">
-              <h3 className="font-semibold text-sm">Announcements</h3>
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              {announcements.length > 0 ? (
-                announcements.map((ann) => (
-                  <div
-                    key={ann.id}
-                    className={`p-3 border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors ${
-                      !ann.read ? "bg-muted/30" : ""
-                    }`}
-                    onClick={() => handleMarkAsRead(ann.id)}
-                  >
-                    <div className="flex gap-2">
-                      <div
-                        className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${ann.read ? "bg-muted" : "bg-accent"}`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{ann.title}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{ann.message}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{ann.time}</p>
+        {/* Announcements/Notifications - Hidden for candidates as it shows false/irrelevant info */}
+        {user.role !== "candidate" && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="relative p-2 hover:bg-muted rounded-lg transition-colors">
+                <Bell size={20} className="text-foreground" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-accent rounded-full flex items-center justify-center text-xs text-accent-foreground font-bold">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <div className="p-3 border-b">
+                <h3 className="font-semibold text-sm">Announcements</h3>
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {announcements.length > 0 ? (
+                  announcements.map((ann) => (
+                    <div
+                      key={ann.id}
+                      className={`p-3 border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors ${!ann.read ? "bg-muted/30" : ""
+                        }`}
+                      onClick={() => handleMarkAsRead(ann.id)}
+                    >
+                      <div className="flex gap-2">
+                        <div
+                          className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${ann.read ? "bg-muted" : "bg-accent"}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{ann.title}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{ann.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{ann.time}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-6 text-center text-sm text-muted-foreground">No announcements</div>
-              )}
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  ))
+                ) : (
+                  <div className="p-6 text-center text-sm text-muted-foreground">No announcements</div>
+                )}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {/* Account Menu */}
         <DropdownMenu>
@@ -236,7 +237,7 @@ export default function Navbar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 z-50">
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex cursor-pointer">
+              <Link href={user.role === 'employee' ? '/employee/profile' : '/profile'} className="flex cursor-pointer">
                 <User size={16} className="mr-2" />
                 <span>My Profile</span>
               </Link>

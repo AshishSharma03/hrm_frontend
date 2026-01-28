@@ -6,40 +6,44 @@ import { useEffect, useState } from "react"
 import { SkeletonGrid, SkeletonTable } from "@/components/skeleton-loader"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Send, Download, Plus } from "lucide-react"
-import { FileText } from "lucide-react"
+import { Send, Download, FileText } from "lucide-react"
 import GenerateOfferModal from "@/components/modals/generate-offer-modal"
 
 export default function AdminOffersPage() {
   const { user, loading, userRole } = useAuth()
   const router = useRouter()
+  const [offers, setOffers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [offers] = useState([
-    {
-      id: "OFF001",
-      candidateName: "Alex Johnson",
-      position: "Senior Developer",
-      salary: "15,00,000",
-      status: "draft",
-      createdDate: "2024-01-20",
-    },
-    {
-      id: "OFF002",
-      candidateName: "Maria Garcia",
-      position: "Product Manager",
-      salary: "12,00,000",
-      status: "sent",
-      createdDate: "2024-01-18",
-    },
-  ])
+
+  const fetchOffers = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/offers/all", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setOffers(data.data)
+      }
+    } catch (error) {
+      console.error("Error fetching offers", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!loading && (!user || userRole !== "admin")) {
       router.push("/login")
     } else if (!loading) {
-      setTimeout(() => setIsLoading(false), 1000)
+      fetchOffers()
     }
   }, [loading, user, userRole, router])
+
+  const handleAction = async (offerId: string, action: string) => {
+    if (action === 'revoke' && !confirm("Are you sure you want to revoke this offer?")) return
+    alert(`${action} offer ${offerId}`)
+  }
 
   if (loading || isLoading) {
     return (
@@ -53,11 +57,7 @@ export default function AdminOffersPage() {
   return (
     <main className="md:ml-64 md:mt-24 p-4 md:p-8 mt-32">
       <div className="mb-8 flex justify-end">
-        <GenerateOfferModal
-          onSubmit={(data) => {
-            console.log("Offer generated:", data)
-          }}
-        />
+        <GenerateOfferModal onSubmit={() => fetchOffers()} />
       </div>
 
       {/* Stats */}
@@ -65,25 +65,30 @@ export default function AdminOffersPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Total Offers</p>
-            <p className="text-3xl font-bold">15</p>
+            <p className="text-3xl font-bold">{offers.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Draft</p>
-            <p className="text-3xl font-bold text-blue-600">3</p>
+            <p className="text-sm text-muted-foreground mb-1">Generated</p>
+            <p className="text-3xl font-bold text-blue-600">
+              {offers.filter((o) => o.status === "generated").length}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Sent</p>
-            <p className="text-3xl font-bold text-green-600">12</p>
+            <p className="text-sm text-muted-foreground mb-1">Accepted</p>
+            <p className="text-3xl font-bold text-green-600">
+              {offers.filter((o) => o.status === "accepted").length}
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Offers List */}
       <div className="space-y-4">
+        {offers.length === 0 && <p className="text-center text-muted-foreground py-8">No offers found.</p>}
         {offers.map((offer) => (
           <Card key={offer.id} className="hover:shadow-lg transition-shadow">
             <CardContent className="pt-6">
@@ -93,36 +98,39 @@ export default function AdminOffersPage() {
                   <p className="text-sm text-muted-foreground">{offer.position}</p>
                 </div>
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    offer.status === "draft" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
-                  }`}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${offer.status === "generated" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
+                    }`}
                 >
                   {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
                 </span>
               </div>
 
               <div className="mb-4">
-                <p className="text-sm text-muted-foreground mb-1">Annual Salary</p>
+                <p className="text-sm text-muted-foreground mb-1">Monthly Salary</p>
                 <p className="text-2xl font-bold">₹{offer.salary}</p>
               </div>
 
               <div className="flex gap-2">
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" onClick={() => handleAction(offer.id, "edit")}>
                   Edit
                 </Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={offer.status === "sent"}>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={offer.status !== "generated"}
+                  onClick={() => handleAction(offer.id, "send")}
+                >
                   <Send size={16} className="mr-2" />
                   Send to Candidate
                 </Button>
-                <Button size="sm" variant="outline">
-                  <Download size={16} className="mr-2" />
-                  Download
+                <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600" onClick={() => handleAction(offer.id, "revoke")}>
+                  Revoke
                 </Button>
               </div>
             </CardContent>
           </Card>
         ))}
-        </div>
+      </div>
     </main>
   )
 }

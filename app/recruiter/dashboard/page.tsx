@@ -5,11 +5,17 @@ import DashboardCard from "@/components/dashboard-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 export default function RecruiterDashboard() {
   const { user, loading, userRole } = useAuth()
   const router = useRouter()
+  const [stats, setStats] = useState({
+    employees: 0,
+    jobs: 0,
+    interviews: 0,
+    hired: 0
+  })
 
   useEffect(() => {
     if (!loading && (!user || userRole !== "recruiter")) {
@@ -17,16 +23,60 @@ export default function RecruiterDashboard() {
     }
   }, [loading, user, userRole, router])
 
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem("authToken")
+        const headers = { Authorization: `Bearer ${token}` }
+
+        // Fetch Employees Count
+        const empRes = await fetch("/api/employees", { headers })
+        const empData = await empRes.json()
+
+        // Fetch Jobs Count
+        const jobRes = await fetch("/api/jobs", { headers })
+        const jobData = await jobRes.json()
+
+        // Fetch Interviews
+        const intRes = await fetch("/api/interviews", { headers })
+        const intData = await intRes.json()
+
+        // Calculate stats
+        const totalEmployees = empData.pagination?.total || 0
+        const totalJobs = jobData.pagination?.total || 0
+        const totalInterviews = intData.data?.length || 0 // Assuming list returns all or we need pagination
+
+        // Calculate Hired this month (mock logic using employees data if available, or just mock for now as API is limited)
+        // We will just use a placeholder from total employees for now or keep mock for complicated logic
+        const hiredCount = 0
+
+        setStats({
+          employees: totalEmployees,
+          jobs: totalJobs,
+          interviews: totalInterviews,
+          hired: hiredCount
+        })
+
+      } catch (error) {
+        console.error("Failed to fetch recruiter stats", error)
+      }
+    }
+
+    if (user && userRole === "recruiter") {
+      fetchStats()
+    }
+  }, [user, userRole])
+
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
 
   return (
     <main className="md:ml-64 md:mt-24 p-4 md:p-8 mt-32">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <DashboardCard label="Employees" value="156" icon={Users} description="Total workforce" href="/recruiter/employees" />
+        <DashboardCard label="Employees" value={stats.employees.toString()} icon={Users} description="Total workforce" href="/recruiter/employees" />
         <DashboardCard
           label="Open Jobs"
-          value="7"
+          value={stats.jobs.toString()}
           icon={Briefcase}
           description="Active job postings"
           href="/recruiter/jobs"
@@ -39,7 +89,7 @@ export default function RecruiterDashboard() {
           description="Total applications"
           trend={{ value: 18, isPositive: true }}
         />
-        <DashboardCard label="Interviews Today" value="3" icon={Calendar} description="Scheduled for today" href="/recruiter/interviews" />
+        <DashboardCard label="Interviews" value={stats.interviews.toString()} icon={Calendar} description="Total Scheduled" href="/recruiter/interviews" />
         <DashboardCard
           label="Pending Approvals"
           value="5"
@@ -48,7 +98,7 @@ export default function RecruiterDashboard() {
         />
         <DashboardCard
           label="This Month Hired"
-          value="8"
+          value={stats.hired.toString()}
           icon={CheckCircle}
           description="New hires onboarded"
           trend={{ value: 12, isPositive: true }}

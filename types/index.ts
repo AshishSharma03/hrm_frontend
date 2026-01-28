@@ -6,6 +6,7 @@ export interface User {
   name: string
   role: UserRole
   status: "active" | "suspended"
+  employeeId?: string
   createdAt: string
 }
 

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { BarChart3, Users, Briefcase, Clock, Award, FileText, LogOut, Home, Menu, X } from "lucide-react"
+import { BarChart3, Users, Briefcase, Clock, Award, FileText, LogOut, Home, Menu, X, UserCheck } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
@@ -13,12 +13,14 @@ const NAVIGATION = {
     { label: "Dashboard", href: "/admin/dashboard", icon: Home },
     { label: "Recruiters", href: "/admin/recruiters", icon: Users },
     { label: "Employees", href: "/admin/employees", icon: Users },
+    { label: "Present Employees", href: "/admin/present", icon: UserCheck },
     { label: "Leave Management", href: "/admin/leave", icon: Clock },
     { label: "Job Postings", href: "/admin/jobs", icon: Briefcase },
     { label: "Interviews", href: "/admin/interviews", icon: FileText },
     { label: "Offers", href: "/admin/offers", icon: Award },
     { label: "Salary", href: "/admin/salary", icon: BarChart3 },
     { label: "Rewards", href: "/admin/rewards", icon: Award },
+    { label: "Onboarding", href: "/admin/onboarding", icon: UserCheck },
   ],
   recruiter: [
     { label: "Dashboard", href: "/recruiter/dashboard", icon: Home },
@@ -28,6 +30,7 @@ const NAVIGATION = {
     { label: "Interviews", href: "/recruiter/interviews", icon: FileText },
     { label: "Offers", href: "/recruiter/offers", icon: Award },
     { label: "Rewards", href: "/recruiter/rewards", icon: Award },
+    { label: "Onboarding", href: "/admin/onboarding", icon: UserCheck },
     { label: "Exit Management", href: "/recruiter/exit", icon: LogOut },
   ],
   employee: [

@@ -7,22 +7,129 @@ import { SkeletonGrid, SkeletonTable } from "@/components/skeleton-loader"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Clock, CheckCircle, XCircle, Search } from "lucide-react"
+import { Clock, CheckCircle, XCircle, Search, Calendar } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
 export default function AdminLeavePage() {
   const { user, loading, userRole } = useAuth()
   const router = useRouter()
+  const [attendance, setAttendance] = useState<any[]>([])
+  const [regularizationRequests, setRegularizationRequests] = useState<any[]>([])
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([])
+  const [employees, setEmployees] = useState<Record<string, string>>({})
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const headers = { Authorization: `Bearer ${token}` }
+      const today = new Date().toISOString().split('T')[0]
+
+      // Fetch Employees for name mapping
+      const empRes = await fetch("/api/employees", { headers })
+      const empData = await empRes.json()
+      if (empData.success) {
+        const map: Record<string, string> = {}
+        empData.data.forEach((e: any) => {
+          const fullName = e.firstName && e.lastName ? `${e.firstName} ${e.lastName}` : null
+          const displayName = e.name || fullName || e.email?.split('@')[0] || e.id
+          // Map by employee ID
+          map[e.id] = displayName
+          // Also map by userId (for attendance records that use user ID)
+          if (e.userId) {
+            map[e.userId] = displayName
+          }
+        })
+        setEmployees(map)
+      }
+
+      // Fetch Attendance Report
+      const attRes = await fetch(`/api/attendance/report?startDate=${today}`, { headers })
+      const attData = await attRes.json()
+      if (attData.success) {
+        setAttendance(attData.data)
+      }
+
+      // Fetch Pending Regularization
+      const regRes = await fetch("/api/attendance/regularization/pending", { headers })
+      const regData = await regRes.json()
+      if (regData.success) {
+        setRegularizationRequests(regData.data)
+      }
+
+      // Fetch Leave Requests
+      const leaveRes = await fetch("/api/leave/request", { headers })
+      const leaveData = await leaveRes.json()
+      if (leaveData.success) {
+        setLeaveRequests(leaveData.data.filter((l: any) => l.status === 'pending'))
+      }
+
+    } catch (error) {
+      console.error("Error fetching leave/attendance data", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!loading && (!user || userRole !== "admin")) {
       router.push("/login")
     } else if (!loading) {
-      setTimeout(() => setIsLoading(false), 1000)
+      fetchData()
     }
   }, [loading, user, userRole, router])
+
+  const handleRegularization = async (id: string, decision: 'APPROVED' | 'REJECTED') => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch(`/api/attendance/regularization/${id}/decision`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ decision })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setRegularizationRequests(prev => prev.filter(r => r.id !== id))
+        fetchData()
+      } else {
+        alert(data.message || "Failed to process request")
+      }
+    } catch (error) {
+      console.error("Regularization error", error)
+    }
+  }
+
+  const handleLeaveDecision = async (requestId: string, decision: 'approve' | 'reject') => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch(`/api/leave/request/${requestId}/${decision}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          approverId: user?.id,
+          approvingManagerName: user?.name,
+          rejectedBy: user?.name,
+          rejectReason: 'Rejected by admin'
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setLeaveRequests(prev => prev.filter(r => r.id !== requestId))
+        fetchData()
+      } else {
+        alert(data.message || "Failed to process leave request")
+      }
+    } catch (error) {
+      console.error("Leave decision error", error)
+    }
+  }
 
   if (loading || isLoading) {
     return (
@@ -33,43 +140,9 @@ export default function AdminLeavePage() {
     )
   }
 
-  // Mock attendance data
-  const attendanceData = [
-    {
-      id: "A001",
-      name: "John Doe",
-      employeeId: "E001",
-      mobile: "+91 98765 43210",
-      checkIn: "09:00 AM",
-      checkOut: "05:30 PM",
-      duration: "8h 30m",
-      status: "present",
-    },
-    {
-      id: "A002",
-      name: "Jane Smith",
-      employeeId: "E002",
-      mobile: "+91 98765 43211",
-      checkIn: "09:15 AM",
-      checkOut: "05:45 PM",
-      duration: "8h 30m",
-      status: "present",
-    },
-    {
-      id: "A003",
-      name: "Mike Johnson",
-      employeeId: "E003",
-      mobile: "+91 98765 43212",
-      checkIn: "10:30 AM",
-      checkOut: "04:00 PM",
-      duration: "5h 30m",
-      status: "regularization",
-    },
-  ]
-
-  const filteredAttendance = attendanceData.filter(
+  const filteredAttendance = attendance.filter(
     (a) =>
-      a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.name || a.employeeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.employeeId.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
@@ -81,36 +154,92 @@ export default function AdminLeavePage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Total Employees</p>
-            <p className="text-3xl font-bold">156</p>
+            <p className="text-3xl font-bold">{Object.keys(employees).length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Present Today</p>
-            <p className="text-3xl font-bold text-green-600">142</p>
+            <p className="text-sm text-muted-foreground mb-1">Checked In Today</p>
+            <p className="text-3xl font-bold text-green-600">{attendance.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Absent</p>
-            <p className="text-3xl font-bold text-red-600">8</p>
+            <p className="text-sm text-muted-foreground mb-1">Pending Leave Requests</p>
+            <p className="text-3xl font-bold text-yellow-600">{leaveRequests.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">Leave Regularization</p>
-            <p className="text-3xl font-bold text-yellow-600">6</p>
+            <p className="text-sm text-muted-foreground mb-1">Pending Regularization</p>
+            <p className="text-3xl font-bold text-orange-600">{regularizationRequests.length}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="attendance" className="space-y-6">
+      <Tabs defaultValue="leave" className="space-y-6">
         <TabsList>
+          <TabsTrigger value="leave">Leave Requests</TabsTrigger>
           <TabsTrigger value="attendance">Attendance Records</TabsTrigger>
-          <TabsTrigger value="regularization">Leave Regularization</TabsTrigger>
+          <TabsTrigger value="regularization">Regularization</TabsTrigger>
         </TabsList>
 
+        {/* Leave Requests Tab */}
+        <TabsContent value="leave">
+          <Card>
+            <CardHeader>
+              <CardTitle>Leave Requests</CardTitle>
+              <CardDescription>Approve or reject employee leave applications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {leaveRequests.length === 0 && (
+                  <p className="text-muted-foreground text-center py-8">No pending leave requests.</p>
+                )}
+                {leaveRequests.map((item) => (
+                  <div key={item.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="font-semibold">{employees[item.employeeId] || item.employeeId}</p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                          <Calendar size={14} />
+                          {item.startDate} - {item.endDate} ({item.totalDays} days)
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">Type: {item.leaveType}</p>
+                        <p className="text-xs text-muted-foreground">Reason: {item.reason}</p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                        Pending
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => handleLeaveDecision(item.id, 'approve')}
+                      >
+                        <CheckCircle size={16} className="mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-500"
+                        onClick={() => handleLeaveDecision(item.id, 'reject')}
+                      >
+                        <XCircle size={16} className="mr-2" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Attendance Tab */}
         <TabsContent value="attendance">
           <Card>
             <CardHeader>
@@ -134,7 +263,6 @@ export default function AdminLeavePage() {
                     <tr className="border-b">
                       <th className="text-left py-3 px-4 font-semibold">Name</th>
                       <th className="text-left py-3 px-4 font-semibold">Employee ID</th>
-                      <th className="text-left py-3 px-4 font-semibold">Mobile</th>
                       <th className="text-left py-3 px-4 font-semibold">Check In</th>
                       <th className="text-left py-3 px-4 font-semibold">Check Out</th>
                       <th className="text-left py-3 px-4 font-semibold">Duration</th>
@@ -143,13 +271,16 @@ export default function AdminLeavePage() {
                   <tbody>
                     {filteredAttendance.map((att) => (
                       <tr key={att.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4 font-medium">{att.name}</td>
+                        <td className="py-3 px-4 font-medium">{employees[att.employeeId] || att.employeeId}</td>
                         <td className="py-3 px-4 font-mono text-xs">{att.employeeId}</td>
-                        <td className="py-3 px-4 text-muted-foreground">{att.mobile}</td>
-                        <td className="py-3 px-4">{att.checkIn}</td>
-                        <td className="py-3 px-4">{att.checkOut}</td>
+                        <td className="py-3 px-4">{att.shifts?.[0]?.checkIn ? new Date(att.shifts[0].checkIn).toLocaleTimeString() : '-'}</td>
                         <td className="py-3 px-4">
-                          <span className="font-semibold">{att.duration}</span>
+                          {att.shifts?.[att.shifts.length - 1]?.checkOut
+                            ? new Date(att.shifts[att.shifts.length - 1].checkOut).toLocaleTimeString()
+                            : '-'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold">{att.totalWorkedHours?.toFixed(2)}h</span>
                         </td>
                       </tr>
                     ))}
@@ -160,41 +291,52 @@ export default function AdminLeavePage() {
           </Card>
         </TabsContent>
 
+        {/* Regularization Tab */}
         <TabsContent value="regularization">
           <Card>
             <CardHeader>
-              <CardTitle>Leave Regularization Requests</CardTitle>
+              <CardTitle>Regularization Requests</CardTitle>
               <CardDescription>Employees with less than 9 hours duration</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredAttendance
-                  .filter((a) => a.status === "regularization")
-                  .map((item) => (
-                    <div key={item.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <p className="font-semibold">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {item.employeeId} • {item.checkIn} - {item.checkOut} ({item.duration})
-                          </p>
-                        </div>
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
-                          Pending
-                        </span>
+                {regularizationRequests.length === 0 && (
+                  <p className="text-muted-foreground text-center py-8">No pending regularization requests.</p>
+                )}
+                {regularizationRequests.map((item) => (
+                  <div key={item.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="font-semibold">{employees[item.employeeId] || item.employeeId}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.date} • {item.proposedChanges?.checkIn} - {item.proposedChanges?.checkOut}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Reason: {item.reason}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                          <CheckCircle size={16} className="mr-2" />
-                          Approve
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <XCircle size={16} className="mr-2" />
-                          Reject
-                        </Button>
-                      </div>
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                        Pending
+                      </span>
                     </div>
-                  ))}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => handleRegularization(item.id, 'APPROVED')}
+                      >
+                        <CheckCircle size={16} className="mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRegularization(item.id, 'REJECTED')}
+                      >
+                        <XCircle size={16} className="mr-2" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

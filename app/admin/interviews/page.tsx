@@ -12,15 +12,38 @@ import { Calendar, Clock, User } from "lucide-react"
 export default function AdminInterviewsPage() {
   const { user, loading, userRole } = useAuth()
   const router = useRouter()
+  const [interviews, setInterviews] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  const fetchInterviews = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/interviews", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setInterviews(data.data)
+      }
+    } catch (error) {
+      console.error("Error fetching interviews", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!loading && (!user || userRole !== "admin")) {
       router.push("/login")
     } else if (!loading) {
-      setTimeout(() => setIsLoading(false), 1000)
+      fetchInterviews()
     }
   }, [loading, user, userRole, router])
+
+  const handleAction = (id: string, action: string) => {
+    // Placeholder for now
+    alert(`${action} interview ${id}`)
+  }
 
   if (loading || isLoading) {
     return (
@@ -31,24 +54,8 @@ export default function AdminInterviewsPage() {
     )
   }
 
-  const interviews = [
-    {
-      id: "INT001",
-      candidateName: "Alex Johnson",
-      position: "Senior Developer",
-      date: "2024-01-25",
-      time: "10:00 AM",
-      status: "scheduled",
-    },
-    {
-      id: "INT002",
-      candidateName: "Maria Garcia",
-      position: "Product Manager",
-      date: "2024-01-25",
-      time: "02:00 PM",
-      status: "scheduled",
-    },
-  ]
+  const today = new Date().toISOString().split('T')[0]
+  const scheduledToday = interviews.filter(i => i.date === today).length
 
   return (
     <main className="md:ml-64 md:mt-24 p-4 md:p-8 mt-32">
@@ -61,25 +68,28 @@ export default function AdminInterviewsPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Total Scheduled</p>
-            <p className="text-3xl font-bold">24</p>
+            <p className="text-3xl font-bold">{interviews.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground mb-1">Today</p>
-            <p className="text-3xl font-bold">3</p>
+            <p className="text-3xl font-bold">{scheduledToday}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-1">This Week</p>
-            <p className="text-3xl font-bold">8</p>
+            <p className="text-sm text-muted-foreground mb-1">Upcoming</p>
+            <p className="text-3xl font-bold">{interviews.filter(i => i.status === 'scheduled').length}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Interview List */}
       <div className="space-y-4">
+        {interviews.length === 0 && (
+          <p className="text-center text-muted-foreground py-8">No interviews scheduled yet.</p>
+        )}
         {interviews.map((interview) => (
           <Card key={interview.id} className="hover:shadow-lg transition-shadow">
             <CardContent className="pt-6">
@@ -87,11 +97,11 @@ export default function AdminInterviewsPage() {
                 <div>
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <User size={20} />
-                    {interview.candidateName}
+                    {interview.candidateEmail}
                   </h3>
-                  <p className="text-sm text-muted-foreground">{interview.position}</p>
+                  <p className="text-sm text-muted-foreground">Job ID: {interview.jobId}</p>
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${interview.status === 'scheduled' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                   {interview.status}
                 </span>
               </div>
@@ -103,25 +113,25 @@ export default function AdminInterviewsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock size={16} className="text-muted-foreground" />
-                  <span>{interview.time}</span>
+                  <span>{interview.time} ({interview.duration})</span>
                 </div>
               </div>
 
               <div className="flex gap-2">
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" onClick={() => handleAction(interview.id, 'Meeting Link')}>
                   Send Meeting Link
                 </Button>
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" onClick={() => handleAction(interview.id, 'Reschedule')}>
                   Reschedule
                 </Button>
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600" onClick={() => handleAction(interview.id, 'Cancel')}>
                   Cancel
                 </Button>
               </div>
             </CardContent>
           </Card>
         ))}
-        </div>
+      </div>
     </main>
   )
 }

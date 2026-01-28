@@ -29,20 +29,52 @@ export default function AddRecruiterModal({ onSubmit }: { onSubmit?: (data: any)
     confirmPassword: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit?.(formData)
-    setFormData({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      specialization: "",
-      experience: "",
-      password: "",
-      confirmPassword: "",
-    })
-    setOpen(false)
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match")
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/recruiters/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          specialization: formData.specialization,
+          experience: formData.experience,
+          password: formData.password
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        onSubmit?.(data.data)
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          phone: "",
+          specialization: "",
+          experience: "",
+          password: "",
+          confirmPassword: "",
+        })
+        setOpen(false)
+      } else {
+        alert(data.message || "Failed to add recruiter")
+      }
+    } catch (error) {
+      console.error("Add recruiter failed", error)
+      alert("An error occurred")
+    }
   }
 
   return (

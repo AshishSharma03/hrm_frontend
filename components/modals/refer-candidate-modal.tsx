@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
+import { useAuth } from "@/lib/auth-context"
 import {
   Dialog,
   DialogContent,
@@ -29,19 +30,47 @@ export default function ReferCandidateModal({ onSubmit }: { onSubmit?: (data: an
     notes: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { user } = useAuth()
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit?.(formData)
-    setFormData({
-      candidateName: "",
-      candidateEmail: "",
-      phone: "",
-      position: "",
-      currentCompany: "",
-      yearsExperience: "",
-      notes: "",
-    })
-    setOpen(false)
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/referrals/refer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employeeId: user?.id,
+          candidateName: formData.candidateName,
+          candidateEmail: formData.candidateEmail,
+          candidatePhone: formData.phone,
+          position: formData.position,
+          reason: formData.notes || "No reason provided",
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        onSubmit?.(data.data)
+        setFormData({
+          candidateName: "",
+          candidateEmail: "",
+          phone: "",
+          position: "",
+          currentCompany: "",
+          yearsExperience: "",
+          notes: "",
+        })
+        setOpen(false)
+      } else {
+        alert(data.message || "Failed to submit referral")
+      }
+    } catch (error) {
+      console.error("Referral failed", error)
+      alert("An error occurred")
+    }
   }
 
   return (
