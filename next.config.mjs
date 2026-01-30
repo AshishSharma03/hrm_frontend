@@ -10,7 +10,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3000/api/:path*',  // Local backend on port 3000
+        destination: 'https://hrm-psi-opal.vercel.app/api/:path*',  // Deployed backend
       },
     ]
   },
