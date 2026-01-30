@@ -40,11 +40,21 @@ export default function PresentEmployeesPage() {
             const empMap: Record<string, any> = {}
             if (empData.success) {
                 empData.data.forEach((e: any) => {
-                    const fullName = e.firstName && e.lastName ? `${e.firstName} ${e.lastName}` : null
-                    const displayName = e.name || fullName || e.email?.split('@')[0] || e.id
-                    empMap[e.id] = { name: displayName, department: e.department }
+                    const displayName = e.name || `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email?.split('@')[0] || e.id
+                    const empInfo = {
+                        name: displayName,
+                        department: e.department || 'General',
+                        designation: e.designation || 'Employee'
+                    }
+                    // Map by employee ID
+                    empMap[e.id] = empInfo
+                    // Also map by userId (attendance might use user ID)
                     if (e.userId) {
-                        empMap[e.userId] = { name: displayName, department: e.department }
+                        empMap[e.userId] = empInfo
+                    }
+                    // Also map by email as fallback
+                    if (e.email) {
+                        empMap[e.email] = empInfo
                     }
                 })
                 setAllEmployees(empMap)

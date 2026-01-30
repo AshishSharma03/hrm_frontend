@@ -36,6 +36,16 @@ export default function AddRecruiterModal({ onSubmit }: { onSubmit?: (data: any)
       return
     }
 
+    if (formData.password.length < 8) {
+      alert("Password must be at least 8 characters")
+      return
+    }
+
+    if (!formData.phone || !formData.specialization || !formData.experience) {
+      alert("Please fill in all required fields")
+      return
+    }
+
     try {
       const token = localStorage.getItem("authToken")
       const res = await fetch("/api/recruiters/register", {
@@ -51,7 +61,8 @@ export default function AddRecruiterModal({ onSubmit }: { onSubmit?: (data: any)
           phone: formData.phone,
           specialization: formData.specialization,
           experience: formData.experience,
-          password: formData.password
+          password: formData.password,
+          confirmPassword: formData.confirmPassword
         })
       })
       const data = await res.json()

@@ -116,11 +116,17 @@ export default function LoginForm() {
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
 
-              <div className="text-center pt-4 border-t mt-4">
+              <div className="text-center pt-4 border-t mt-4 space-y-2">
                 <p className="text-sm text-muted-foreground">
                   New here?{" "}
                   <Link href="/register" className="text-primary font-semibold hover:underline">
                     Join as Candidate
+                  </Link>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Are you a recruiter?{" "}
+                  <Link href="/register/recruiter" className="text-blue-600 font-semibold hover:underline">
+                    Register as Recruiter
                   </Link>
                 </p>
               </div>

@@ -1,8 +1,9 @@
 "use client"
 
-import { Users, Briefcase, Calendar, CheckCircle, FileText, Award } from "lucide-react"
+import { Users, Briefcase, Calendar, CheckCircle, FileText, Award, Clock, LogIn, LogOut, AlertCircle } from "lucide-react"
 import DashboardCard from "@/components/dashboard-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -17,63 +18,166 @@ export default function RecruiterDashboard() {
     hired: 0
   })
 
+  // Attendance State
+  const [isCheckedIn, setIsCheckedIn] = useState(false)
+  const [checkInTime, setCheckInTime] = useState<string | null>(null)
+  const [hoursWorked, setHoursWorked] = useState("0h 0m")
+  const [attendanceId, setAttendanceId] = useState<string | null>(null)
+
   useEffect(() => {
     if (!loading && (!user || userRole !== "recruiter")) {
       router.push("/login")
     }
   }, [loading, user, userRole, router])
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const token = localStorage.getItem("authToken")
-        const headers = { Authorization: `Bearer ${token}` }
+  const fetchStats = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const headers = { Authorization: `Bearer ${token}` }
 
-        // Fetch Employees Count
-        const empRes = await fetch("/api/employees", { headers })
-        const empData = await empRes.json()
+      // Fetch Employees Count
+      const empRes = await fetch("/api/employees", { headers })
+      const empData = await empRes.json()
 
-        // Fetch Jobs Count
-        const jobRes = await fetch("/api/jobs", { headers })
-        const jobData = await jobRes.json()
+      // Fetch Jobs Count
+      const jobRes = await fetch("/api/jobs", { headers })
+      const jobData = await jobRes.json()
 
-        // Fetch Interviews
-        const intRes = await fetch("/api/interviews", { headers })
-        const intData = await intRes.json()
+      // Fetch Interviews
+      const intRes = await fetch("/api/interviews", { headers })
+      const intData = await intRes.json()
 
-        // Calculate stats
-        const totalEmployees = empData.pagination?.total || 0
-        const totalJobs = jobData.pagination?.total || 0
-        const totalInterviews = intData.data?.length || 0 // Assuming list returns all or we need pagination
+      setStats({
+        employees: empData.pagination?.total || 0,
+        jobs: jobData.pagination?.total || 0,
+        interviews: intData.data?.length || 0,
+        hired: 0 // Placeholder
+      })
 
-        // Calculate Hired this month (mock logic using employees data if available, or just mock for now as API is limited)
-        // We will just use a placeholder from total employees for now or keep mock for complicated logic
-        const hiredCount = 0
-
-        setStats({
-          employees: totalEmployees,
-          jobs: totalJobs,
-          interviews: totalInterviews,
-          hired: hiredCount
-        })
-
-      } catch (error) {
-        console.error("Failed to fetch recruiter stats", error)
+      // Fetch Today's Attendance Status
+      const attendanceRes = await fetch("/api/attendance/today", { headers })
+      const attendanceData = await attendanceRes.json()
+      if (attendanceData.success && attendanceData.data) {
+        const status = attendanceData.data.status
+        setIsCheckedIn(status === "ACTIVE")
+        if (attendanceData.data.checkIn) {
+          setCheckInTime(new Date(attendanceData.data.checkIn).toLocaleTimeString())
+        }
+        if (attendanceData.data.workedHours) {
+          setHoursWorked(`${attendanceData.data.workedHours}h`)
+        }
       }
-    }
 
+    } catch (error) {
+      console.error("Failed to fetch recruiter stats", error)
+    }
+  }
+
+  useEffect(() => {
     if (user && userRole === "recruiter") {
       fetchStats()
     }
   }, [user, userRole])
 
+  const handleCheckIn = async () => {
+    try {
+      const token = localStorage.getItem("authToken")
+      const now = new Date()
+      const locationData = {
+        employeeId: user?.id,
+        location: "Office (Recruiter)",
+        timestamp: now.toISOString(),
+        latitude: 0,
+        longitude: 0
+      }
+
+      const res = await fetch("/api/attendance/checkin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(locationData)
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setCheckInTime(new Date(data.data.checkIn).toLocaleTimeString())
+        setIsCheckedIn(true)
+      }
+    } catch (error) {
+      console.error("Check-in failed", error)
+    }
+  }
+
+  const handleCheckOut = async () => {
+    if (!isCheckedIn) return
+
+    try {
+      const token = localStorage.getItem("authToken")
+      const now = new Date()
+      const locationData = {
+        employeeId: user?.id,
+        location: "Office (Recruiter)",
+        timestamp: now.toISOString(),
+        latitude: 0,
+        longitude: 0
+      }
+
+      const res = await fetch("/api/attendance/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(locationData)
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setIsCheckedIn(false)
+        setHoursWorked(`${data.data.totalWorkedHours}h`)
+        setCheckInTime(null)
+      }
+    } catch (error) {
+      console.error("Check-out failed", error)
+    }
+  }
+
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
 
   return (
     <main className="md:ml-64 md:mt-24 p-4 md:p-8 mt-32">
+      {/* Check In/Out Buttons */}
+      <div className="mb-8 flex gap-2 flex-wrap">
+        <Button
+          onClick={handleCheckIn}
+          disabled={isCheckedIn}
+          className={`flex items-center gap-2 ${isCheckedIn ? "bg-muted" : "bg-green-600 hover:bg-green-700"}`}
+        >
+          <LogIn size={18} />
+          Check In
+        </Button>
+        <Button
+          onClick={handleCheckOut}
+          disabled={!isCheckedIn}
+          variant={isCheckedIn ? "default" : "outline"}
+          className={`flex items-center gap-2 ${isCheckedIn ? "bg-red-600 hover:bg-red-700" : ""}`}
+        >
+          <LogOut size={18} />
+          Check Out
+        </Button>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <DashboardCard label="Employees" value={stats.employees.toString()} icon={Users} description="Total workforce" href="/recruiter/employees" />
+        <DashboardCard
+          label="Check In Time"
+          value={checkInTime || "Not checked in"}
+          icon={CheckCircle}
+          description={isCheckedIn ? "Checked in" : "Pending"}
+        />
+        <DashboardCard label="Employees" value={stats.employees.toString()} icon={Users} description="Total workforce" />
         <DashboardCard
           label="Open Jobs"
           value={stats.jobs.toString()}
@@ -95,13 +199,6 @@ export default function RecruiterDashboard() {
           value="5"
           icon={Award}
           description="Employee registrations waiting"
-        />
-        <DashboardCard
-          label="This Month Hired"
-          value={stats.hired.toString()}
-          icon={CheckCircle}
-          description="New hires onboarded"
-          trend={{ value: 12, isPositive: true }}
         />
       </div>
 

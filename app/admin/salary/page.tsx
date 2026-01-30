@@ -9,6 +9,7 @@ import { Plus, Download, Mail } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import GenerateSalaryModal from "@/components/modals/generate-salary-modal"
+import UpdateSalaryModal from "@/components/modals/update-salary-modal"
 import { SkeletonGrid, SkeletonTable } from "@/components/skeleton-loader"
 
 export default function AdminSalaryPage() {
@@ -23,27 +24,42 @@ export default function AdminSalaryPage() {
       const token = localStorage.getItem("authToken")
       const headers = { Authorization: `Bearer ${token}` }
 
-      // Fetch Employees
-      const empRes = await fetch("/api/employees", { headers })
-      const empData = await empRes.json()
-      if (empData.success) {
-        setEmployees(empData.data)
 
-        // Fetch Salary Structure for each employee
-        const salariesResp: Record<string, any> = {}
-        await Promise.all(empData.data.map(async (emp: any) => {
-          try {
-            const sRes = await fetch(`/api/salary/${emp.id}`, { headers })
-            const sData = await sRes.json()
-            if (sData.success) {
-              salariesResp[emp.id] = sData.data
-            }
-          } catch (e) {
-            console.error(`Error fetching salary for ${emp.id}`, e)
-          }
-        }))
-        setSalariesMap(salariesResp)
+      // Fetch Employees and Recruiters (with high limit to get all)
+      const [empRes, recRes] = await Promise.all([
+        fetch("/api/employees?limit=1000", { headers }),
+        fetch("/api/recruiters?limit=1000", { headers })
+      ])
+
+      const empData = await empRes.json()
+      const recData = await recRes.json()
+
+      let allStaff: any[] = []
+
+      if (empData.success) {
+        allStaff = [...allStaff, ...empData.data.map((e: any) => ({ ...e, role: 'Employee' }))]
       }
+      if (recData.success) {
+        allStaff = [...allStaff, ...recData.data.map((r: any) => ({ ...r, role: 'Recruiter', name: r.name || `${r.firstName} ${r.lastName}` }))]
+      }
+
+      setEmployees(allStaff)
+
+      // Fetch Salary Structure for each staff member
+      const salariesResp: Record<string, any> = {}
+      await Promise.all(allStaff.map(async (p: any) => {
+        try {
+          const sRes = await fetch(`/api/salary/${p.id}`, { headers })
+          const sData = await sRes.json()
+          if (sData.success) {
+            salariesResp[p.id] = sData.data
+          }
+        } catch (e) {
+          console.error(`Error fetching salary for ${p.id}`, e)
+        }
+      }))
+      setSalariesMap(salariesResp)
+
     } catch (error) {
       console.error("Error fetching salary data", error)
     } finally {
@@ -113,7 +129,12 @@ export default function AdminSalaryPage() {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-lg font-semibold">{emp.name || `${emp.firstName} ${emp.lastName}`}</h3>
-                      <p className="text-sm text-muted-foreground">{emp.designation || emp.department}</p>
+                      <div className="flex gap-2 items-center">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${emp.role === 'Recruiter' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {emp.role}
+                        </span>
+                        <p className="text-sm text-muted-foreground">{emp.designation || emp.department}</p>
+                      </div>
                     </div>
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${structure ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
@@ -129,6 +150,12 @@ export default function AdminSalaryPage() {
                   </div>
 
                   <div className="flex gap-2">
+                    <UpdateSalaryModal
+                      employeeId={emp.id}
+                      employeeName={emp.name || `${emp.firstName} ${emp.lastName}`}
+                      currentStructure={structure}
+                      onSubmit={() => fetchData()}
+                    />
                     <Button size="sm" variant="outline" onClick={() => router.push(`/admin/salary/${emp.id}`)}>
                       <Download size={16} className="mr-2" />
                       View Structure

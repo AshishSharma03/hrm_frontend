@@ -24,7 +24,7 @@ export default function AdminEmployeesPage() {
   const fetchEmployees = async () => {
     try {
       const token = localStorage.getItem("authToken")
-      const res = await fetch("/api/employees", {
+      const res = await fetch("/api/employees?limit=1000", {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()

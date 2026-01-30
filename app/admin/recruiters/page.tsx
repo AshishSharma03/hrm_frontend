@@ -22,7 +22,7 @@ export default function AdminRecruitersPage() {
   const fetchRecruiters = async () => {
     try {
       const token = localStorage.getItem("authToken")
-      const res = await fetch("/api/recruiters", {
+      const res = await fetch("/api/recruiters?limit=1000", {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()

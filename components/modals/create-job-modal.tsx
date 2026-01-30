@@ -33,6 +33,12 @@ export default function CreateJobModal({ onSubmit }: { onSubmit?: (data: any) =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.jobTitle || !formData.department || !formData.experience || !formData.salary || !formData.jobType || !formData.location || !formData.description) {
+      alert("Please fill in all required fields")
+      return
+    }
+
     try {
       const token = localStorage.getItem("authToken")
       const res = await fetch("/api/jobs", {

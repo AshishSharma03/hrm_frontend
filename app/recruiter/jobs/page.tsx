@@ -92,7 +92,7 @@ export default function RecruiterJobsPage() {
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${job.status === "active" ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
                     }`}>
-                    {job.status.toUpperCase()}
+                    {job.status ? job.status.toUpperCase() : "ACTIVE"}
                   </span>
                 </div>
 
@@ -118,7 +118,7 @@ export default function RecruiterJobsPage() {
                 <div className="flex justify-between items-center pt-4 border-t">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar size={14} />
-                    Posted on {new Date(job.createdDate).toLocaleDateString()}
+                    Posted on {job.createdDate ? new Date(job.createdDate).toLocaleDateString() : 'N/A'}
                   </div>
                   <p className="font-semibold text-primary">₹{job.salary}</p>
                 </div>

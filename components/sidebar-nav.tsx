@@ -24,13 +24,14 @@ const NAVIGATION = {
   ],
   recruiter: [
     { label: "Dashboard", href: "/recruiter/dashboard", icon: Home },
-    { label: "Employees", href: "/recruiter/employees", icon: Users },
+    { label: "Profile", href: "/recruiter/profile", icon: Users },
+    { label: "Attendance", href: "/recruiter/attendance", icon: Clock },
+    { label: "Salary", href: "/recruiter/salary", icon: BarChart3 },
     { label: "Leave Management", href: "/recruiter/leave", icon: Clock },
     { label: "Job Postings", href: "/recruiter/jobs", icon: Briefcase },
     { label: "Interviews", href: "/recruiter/interviews", icon: FileText },
     { label: "Offers", href: "/recruiter/offers", icon: Award },
     { label: "Rewards", href: "/recruiter/rewards", icon: Award },
-    { label: "Onboarding", href: "/admin/onboarding", icon: UserCheck },
     { label: "Exit Management", href: "/recruiter/exit", icon: LogOut },
   ],
   employee: [
